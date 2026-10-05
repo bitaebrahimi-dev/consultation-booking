@@ -26,11 +26,11 @@ class WeeklySchedule(models.Model):
     )
 
     def clean(self):
-        if self.start_time >= self.end_time:
-            raise ValidationError(
-                {"end_time": "ساعت پایان باید بعد از ساعت شروع باشد."}
-            )
-
+        if self.start_time and self.end_time:
+            if self.start_time >= self.end_time:
+                raise ValidationError(
+                    {"end_time": "ساعت پایان باید بعد از ساعت شروع باشد."}
+                )
     def __str__(self):
         return f"{self.get_weekday_display()} - {self.start_time} تا {self.end_time}"
 
