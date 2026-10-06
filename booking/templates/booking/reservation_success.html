@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تأیید رزرو</title>
+</head>
+<body>
+
+<h1>رزرو شما با موفقیت ثبت شد</h1>
+
+<p>
+    نام:
+    <strong>{{ reservation.name }}</strong>
+</p>
+
+<p>
+    شماره موبایل:
+    <strong>{{ reservation.mobile }}</strong>
+</p>
+
+<p>
+    موضوع مشاوره:
+    <strong>{{ reservation.topic }}</strong>
+</p>
+
+<p>
+    زمان رزرو:
+    <strong>
+        {{ reservation.scheduled_at|date:"Y/m/d H:i" }}
+    </strong>
+</p>
+
+<hr>
+
+<p>
+    کد پیگیری:
+    <strong>{{ reservation.tracking_code }}</strong>
+</p>
+
+<p>
+    لطفاً کد پیگیری را برای مراجعات بعدی نگه دارید.
+</p>
+
+</body>
+</html>

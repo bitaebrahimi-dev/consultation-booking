@@ -19,8 +19,13 @@ def get_schedules_for_date(target_date):
 def generate_raw_slots(target_date, start_time, end_time, session_duration):
     slots = []
 
-    current = datetime.combine(target_date, start_time)
-    end = datetime.combine(target_date, end_time)
+    current = timezone.make_aware(
+        datetime.combine(target_date, start_time)
+    )
+
+    end = timezone.make_aware(
+        datetime.combine(target_date, end_time)
+    )
 
     duration = timedelta(minutes=session_duration)
 
@@ -59,9 +64,7 @@ def remove_past_slots(slots):
     future_slots = []
 
     for slot in slots:
-        aware_slot = timezone.make_aware(slot)
-
-        if aware_slot > now:
+        if slot > now:
             future_slots.append(slot)
 
     return future_slots
@@ -72,20 +75,17 @@ def remove_past_slots(slots):
     future_slots = []
 
     for slot in slots:
-        aware_slot = timezone.make_aware(slot)
-
-        if aware_slot > now:
+        if slot > now:
             future_slots.append(slot)
 
     return future_slots
-
 
 def remove_booked_slots(slots):
     available_slots = []
 
     for slot in slots:
         is_booked = Reservation.objects.filter(
-            scheduled_at=timezone.make_aware(slot),
+            scheduled_at=slot,
             status="confirmed",
         ).exists()
 
