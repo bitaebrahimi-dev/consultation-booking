@@ -42,7 +42,7 @@ The system also includes an admin panel for managing weekly schedules and holida
 1. Clone the repository:
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/bitaebrahimi-dev/consultation-booking.git
 ```
 
 2. Navigate to the project directory:
