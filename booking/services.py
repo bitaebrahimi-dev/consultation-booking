@@ -70,17 +70,6 @@ def remove_past_slots(slots):
     return future_slots
 
 
-def remove_past_slots(slots):
-    now = timezone.now()
-    future_slots = []
-
-    for slot in slots:
-        if slot > now:
-            future_slots.append(slot)
-
-    return future_slots
-
-
 def remove_booked_slots(slots):
     available_slots = []
 
@@ -173,15 +162,15 @@ def format_selected_slot(selected_slot):
     if not selected_slot:
         return None
 
-    selected_datetime = datetime.strptime(
-        selected_slot,
-        "%Y-%m-%d %H:%M",
-    )
+    try:
+        selected_datetime = datetime.strptime(
+            selected_slot,
+            "%Y-%m-%d %H:%M",
+        )
+    except ValueError:
+        return None
 
-    jalali_date = to_jalali_date(
-        selected_datetime.date()
-    )
-
+    jalali_date = to_jalali_date(selected_datetime.date())
     jalali_display = format_jalali_date(jalali_date)
 
     return (

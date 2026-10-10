@@ -1,6 +1,5 @@
 from django.db import IntegrityError, transaction
-from django.shortcuts import render
-
+from django.shortcuts import render, redirect
 from .forms import ReservationForm
 from .services import (
     get_next_7_days_with_jalali,
@@ -42,7 +41,12 @@ def create_reservation(request):
 
     else:
         selected_slot = request.GET.get("slot")
+        if not selected_slot:
+            return redirect("availability")
         selected_slot_display = format_selected_slot(selected_slot)
+        if selected_slot_display is None:
+            return redirect("availability")
+
 
         form = ReservationForm(
             initial={

@@ -1,4 +1,4 @@
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from .forms import ReservationForm
 from django.db import IntegrityError, transaction
 from django.test import TestCase
@@ -8,10 +8,43 @@ from .models import Holiday, Reservation, WeeklySchedule
 from .services import generate_raw_slots, generate_slots_for_date
 
 
+def get_future_monday():
+    today = timezone.localdate()
+
+    days_ahead = (0 - today.weekday()) % 7
+
+    if days_ahead == 0:
+        days_ahead = 7
+
+    return today + timedelta(days=days_ahead)
+
+
+def get_future_monday_datetime(hour, minute=0):
+    future_monday = get_future_monday()
+
+    return timezone.make_aware(
+        datetime.combine(
+            future_monday,
+            time(hour, minute),
+        )
+    )
+
+
+def get_future_monday_string(hour, minute=0):
+    future_datetime = get_future_monday_datetime(
+        hour,
+        minute,
+    )
+
+    return future_datetime.strftime("%Y-%m-%d %H:%M")
+
+
 class SlotGenerationTests(TestCase):
     def test_generate_raw_slots(self):
+        future_monday = get_future_monday()
+
         slots = generate_raw_slots(
-            date(2026, 10, 12),
+            future_monday,
             time(9, 0),
             time(11, 0),
             30,
@@ -20,8 +53,10 @@ class SlotGenerationTests(TestCase):
         self.assertEqual(len(slots), 4)
 
     def test_incomplete_slot_is_not_generated(self):
+        future_monday = get_future_monday()
+
         slots = generate_raw_slots(
-            date(2026, 10, 12),
+            future_monday,
             time(10, 0),
             time(11, 20),
             30,
@@ -32,6 +67,8 @@ class SlotGenerationTests(TestCase):
 
 class SlotFilterTests(TestCase):
     def test_holiday_returns_no_slots(self):
+        future_monday = get_future_monday()
+
         WeeklySchedule.objects.create(
             weekday=2,
             start_time=time(9, 0),
@@ -40,11 +77,11 @@ class SlotFilterTests(TestCase):
         )
 
         Holiday.objects.create(
-            date=date(2026, 10, 12),
+            date=future_monday,
             reason="تعطیلی آزمایشی",
         )
 
-        slots = generate_slots_for_date(date(2026, 10, 12))
+        slots = generate_slots_for_date(future_monday)
 
         self.assertEqual(slots, [])
 
@@ -56,11 +93,15 @@ class SlotFilterTests(TestCase):
             session_duration=30,
         )
 
-        slots = generate_slots_for_date(date(2020, 1, 6))
+        slots = generate_slots_for_date(
+            date(2020, 1, 6)
+        )
 
         self.assertEqual(slots, [])
 
     def test_booked_slot_is_removed(self):
+        future_monday = get_future_monday()
+
         WeeklySchedule.objects.create(
             weekday=2,
             start_time=time(9, 0),
@@ -68,8 +109,9 @@ class SlotFilterTests(TestCase):
             session_duration=30,
         )
 
-        booked_time = timezone.make_aware(
-            datetime(2026, 10, 12, 10, 0)
+        booked_time = get_future_monday_datetime(
+            10,
+            0,
         )
 
         Reservation.objects.create(
@@ -80,7 +122,9 @@ class SlotFilterTests(TestCase):
             status="confirmed",
         )
 
-        slots = generate_slots_for_date(date(2026, 10, 12))
+        slots = generate_slots_for_date(
+            future_monday
+        )
 
         self.assertNotIn(
             booked_time,
@@ -88,6 +132,8 @@ class SlotFilterTests(TestCase):
         )
 
     def test_cancelled_reservation_does_not_block_slot(self):
+        future_monday = get_future_monday()
+
         WeeklySchedule.objects.create(
             weekday=2,
             start_time=time(9, 0),
@@ -95,8 +141,9 @@ class SlotFilterTests(TestCase):
             session_duration=30,
         )
 
-        cancelled_time = timezone.make_aware(
-            datetime(2026, 10, 12, 10, 0)
+        cancelled_time = get_future_monday_datetime(
+            10,
+            0,
         )
 
         Reservation.objects.create(
@@ -107,7 +154,9 @@ class SlotFilterTests(TestCase):
             status="cancelled",
         )
 
-        slots = generate_slots_for_date(date(2026, 10, 12))
+        slots = generate_slots_for_date(
+            future_monday
+        )
 
         self.assertIn(
             cancelled_time,
@@ -115,8 +164,13 @@ class SlotFilterTests(TestCase):
         )
 
     def test_day_without_schedule_returns_no_slots(self):
+        future_tuesday = (
+            get_future_monday()
+            + timedelta(days=1)
+        )
+
         slots = generate_slots_for_date(
-            date(2026, 10, 13)
+            future_tuesday
         )
 
         self.assertEqual(slots, [])
@@ -128,7 +182,7 @@ class ReservationFormMobileTests(TestCase):
             "name": "Mobin",
             "mobile": "09121234567",
             "topic": "Test consultation",
-            "scheduled_at": "2026-10-12 10:00",
+            "scheduled_at": get_future_monday_string(10),
         })
 
         form.is_valid()
@@ -143,7 +197,7 @@ class ReservationFormMobileTests(TestCase):
             "name": "Mobin",
             "mobile": "۰۹۱۲۱۲۳۴۵۶۷",
             "topic": "Test consultation",
-            "scheduled_at": "2026-10-12 10:00",
+            "scheduled_at": get_future_monday_string(10),
         })
 
         form.is_valid()
@@ -158,7 +212,7 @@ class ReservationFormMobileTests(TestCase):
             "name": "Mobin",
             "mobile": "08121234567",
             "topic": "Test consultation",
-            "scheduled_at": "2026-10-12 10:00",
+            "scheduled_at": get_future_monday_string(10),
         })
 
         form.is_valid()
@@ -171,8 +225,9 @@ class ReservationFormMobileTests(TestCase):
 
 class ReservationConstraintTests(TestCase):
     def test_duplicate_active_reservation_is_rejected(self):
-        slot_time = timezone.make_aware(
-            datetime(2026, 10, 12, 10, 0)
+        slot_time = get_future_monday_datetime(
+            10,
+            0,
         )
 
         Reservation.objects.create(
@@ -194,8 +249,9 @@ class ReservationConstraintTests(TestCase):
                 )
 
     def test_cancelled_reservation_allows_new_active_reservation(self):
-        slot_time = timezone.make_aware(
-            datetime(2026, 10, 12, 10, 0)
+        slot_time = get_future_monday_datetime(
+            10,
+            0,
         )
 
         Reservation.objects.create(
@@ -220,8 +276,9 @@ class ReservationConstraintTests(TestCase):
         )
 
     def test_duplicate_active_reservation_raises_integrity_error(self):
-        slot_time = timezone.make_aware(
-            datetime(2026, 10, 12, 11, 0)
+        slot_time = get_future_monday_datetime(
+            11,
+            0,
         )
 
         Reservation.objects.create(
@@ -256,26 +313,7 @@ class ReservationFormTimeTests(TestCase):
             "name": "Mobin",
             "mobile": "09121234567",
             "topic": "Test consultation",
-            "scheduled_at": "2026-10-12 10:00",
-        })
-
-        self.assertTrue(form.is_valid())
-
-
-class ReservationFormTimeTests(TestCase):
-    def test_valid_available_time_is_accepted(self):
-        WeeklySchedule.objects.create(
-            weekday=2,
-            start_time=time(9, 0),
-            end_time=time(11, 0),
-            session_duration=30,
-        )
-
-        form = ReservationForm(data={
-            "name": "Mobin",
-            "mobile": "09121234567",
-            "topic": "Test consultation",
-            "scheduled_at": "2026-10-12 10:00",
+            "scheduled_at": get_future_monday_string(10),
         })
 
         self.assertTrue(form.is_valid())
@@ -292,7 +330,7 @@ class ReservationFormTimeTests(TestCase):
             "name": "Mobin",
             "mobile": "09121234567",
             "topic": "Test consultation",
-            "scheduled_at": "2026-10-12 10:15",
+            "scheduled_at": get_future_monday_string(10, 15),
         })
 
         self.assertFalse(form.is_valid())
@@ -325,6 +363,8 @@ class ReservationFormTimeTests(TestCase):
         )
 
     def test_holiday_time_is_rejected(self):
+        future_monday = get_future_monday()
+
         WeeklySchedule.objects.create(
             weekday=2,
             start_time=time(9, 0),
@@ -333,7 +373,7 @@ class ReservationFormTimeTests(TestCase):
         )
 
         Holiday.objects.create(
-            date=date(2026, 10, 12),
+            date=future_monday,
             reason="تعطیلی آزمایشی",
         )
 
@@ -341,7 +381,7 @@ class ReservationFormTimeTests(TestCase):
             "name": "Mobin",
             "mobile": "09121234567",
             "topic": "Test consultation",
-            "scheduled_at": "2026-10-12 10:00",
+            "scheduled_at": get_future_monday_string(10),
         })
 
         self.assertFalse(form.is_valid())
@@ -359,8 +399,9 @@ class ReservationFormTimeTests(TestCase):
             session_duration=30,
         )
 
-        booked_time = timezone.make_aware(
-            datetime(2026, 10, 12, 10, 0)
+        booked_time = get_future_monday_datetime(
+            10,
+            0,
         )
 
         Reservation.objects.create(
@@ -375,7 +416,7 @@ class ReservationFormTimeTests(TestCase):
             "name": "User Two",
             "mobile": "09129876543",
             "topic": "Second consultation",
-            "scheduled_at": "2026-10-12 10:00",
+            "scheduled_at": get_future_monday_string(10),
         })
 
         self.assertFalse(form.is_valid())
@@ -393,8 +434,9 @@ class ReservationFormTimeTests(TestCase):
             session_duration=30,
         )
 
-        cancelled_time = timezone.make_aware(
-            datetime(2026, 10, 12, 10, 0)
+        cancelled_time = get_future_monday_datetime(
+            10,
+            0,
         )
 
         Reservation.objects.create(
@@ -409,11 +451,10 @@ class ReservationFormTimeTests(TestCase):
             "name": "User Two",
             "mobile": "09129876543",
             "topic": "New consultation",
-            "scheduled_at": "2026-10-12 10:00",
+            "scheduled_at": get_future_monday_string(10),
         })
 
         self.assertTrue(form.is_valid())
-
 
 class ReservationViewTests(TestCase):
     def test_valid_reservation_is_created(self):
@@ -430,7 +471,7 @@ class ReservationViewTests(TestCase):
                 "name": "Mobin",
                 "mobile": "09121234567",
                 "topic": "Test consultation",
-                "scheduled_at": "2026-10-12 10:00",
+                "scheduled_at": get_future_monday_string(10),
             },
         )
 
@@ -439,9 +480,7 @@ class ReservationViewTests(TestCase):
         self.assertTrue(
             Reservation.objects.filter(
                 mobile="09121234567",
-                scheduled_at=timezone.make_aware(
-                    datetime(2026, 10, 12, 10, 0)
-                ),
+                scheduled_at=get_future_monday_datetime(10),
             ).exists()
         )
 
@@ -459,7 +498,7 @@ class ReservationViewTests(TestCase):
                 "name": "Mobin",
                 "mobile": "09121234567",
                 "topic": "Test confirmation page",
-                "scheduled_at": "2026-10-12 10:00",
+                "scheduled_at": get_future_monday_string(10),
             },
         )
 
@@ -484,7 +523,7 @@ class ReservationViewTests(TestCase):
                 "name": "Mobin",
                 "mobile": "09121234567",
                 "topic": "Tracking code test",
-                "scheduled_at": "2026-10-12 10:00",
+                "scheduled_at": get_future_monday_string(10),
             },
         )
 
@@ -505,8 +544,9 @@ class ReservationViewTests(TestCase):
             session_duration=30,
         )
 
-        slot_time = timezone.make_aware(
-            datetime(2026, 10, 12, 10, 0)
+        slot_time = get_future_monday_datetime(
+            10,
+            0,
         )
 
         Reservation.objects.create(
@@ -523,7 +563,7 @@ class ReservationViewTests(TestCase):
                 "name": "User Two",
                 "mobile": "09129876543",
                 "topic": "Second consultation",
-                "scheduled_at": "2026-10-12 10:00",
+                "scheduled_at": get_future_monday_string(10),
             },
         )
 
@@ -556,7 +596,7 @@ class ReservationViewTests(TestCase):
                 "name": "Mobin",
                 "mobile": "۰۹۱۲۱۲۳۴۵۶۷",
                 "topic": "Persian mobile test",
-                "scheduled_at": "2026-10-12 10:00",
+                "scheduled_at": get_future_monday_string(10),
             },
         )
 
@@ -569,4 +609,27 @@ class ReservationViewTests(TestCase):
         self.assertEqual(
             reservation.mobile,
             "09121234567",
+        )
+
+    def test_reserve_without_slot_redirects_to_availability(self):
+        response = self.client.get(
+            reverse("create_reservation")
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("availability"),
+        )
+
+    def test_invalid_slot_redirects_to_availability(self):
+        response = self.client.get(
+            reverse("create_reservation"),
+            {
+                "slot": "abc",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("availability"),
         )
