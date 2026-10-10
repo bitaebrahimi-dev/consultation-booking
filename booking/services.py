@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
-from .models import Holiday, WeeklySchedule
 from django.utils import timezone
 from .models import Holiday, Reservation, WeeklySchedule
+import jdatetime
 
 
 def get_model_weekday(target_date):
@@ -80,6 +80,7 @@ def remove_past_slots(slots):
 
     return future_slots
 
+
 def remove_booked_slots(slots):
     available_slots = []
 
@@ -93,3 +94,110 @@ def remove_booked_slots(slots):
             available_slots.append(slot)
 
     return available_slots
+
+
+def get_next_7_days():
+    today = timezone.localdate()
+
+    days = []
+
+    for day_number in range(7):
+        target_date = today + timedelta(days=day_number)
+        days.append(target_date)
+
+    return days
+
+
+def to_jalali_date(gregorian_date):
+    jalali_date = jdatetime.date.fromgregorian(
+        date=gregorian_date
+    )
+
+    return jalali_date
+
+
+def get_next_7_days_with_jalali():
+    days = []
+
+    for gregorian_date in get_next_7_days():
+        jalali_date = to_jalali_date(gregorian_date)
+        slots = generate_slots_for_date(gregorian_date)
+
+        days.append({
+            "gregorian": gregorian_date,
+            "jalali": jalali_date,
+            "jalali_display": format_jalali_date(jalali_date),
+            "slots": slots,
+
+        })
+
+    return days
+
+
+def format_jalali_date(jalali_date):
+    weekday_names = {
+        "Saturday": "شنبه",
+        "Sunday": "یکشنبه",
+        "Monday": "دوشنبه",
+        "Tuesday": "سه‌شنبه",
+        "Wednesday": "چهارشنبه",
+        "Thursday": "پنجشنبه",
+        "Friday": "جمعه",
+    }
+
+    months = [
+        "",
+        "فروردین",
+        "اردیبهشت",
+        "خرداد",
+        "تیر",
+        "مرداد",
+        "شهریور",
+        "مهر",
+        "آبان",
+        "آذر",
+        "دی",
+        "بهمن",
+        "اسفند",
+    ]
+
+    english_weekday = jalali_date.strftime("%A")
+
+    weekday_name = weekday_names[english_weekday]
+    month_name = months[jalali_date.month]
+
+    return f"{weekday_name} {jalali_date.day} {month_name}"
+
+
+def format_selected_slot(selected_slot):
+    if not selected_slot:
+        return None
+
+    selected_datetime = datetime.strptime(
+        selected_slot,
+        "%Y-%m-%d %H:%M",
+    )
+
+    jalali_date = to_jalali_date(
+        selected_datetime.date()
+    )
+
+    jalali_display = format_jalali_date(jalali_date)
+
+    return (
+        f"{jalali_display} — "
+        f"ساعت {selected_datetime.strftime('%H:%M')}"
+    )
+
+
+def format_reservation_datetime(reservation_datetime):
+    jalali_date = to_jalali_date(
+        reservation_datetime.date()
+    )
+
+    jalali_display = format_jalali_date(jalali_date)
+
+    return (
+        f"{jalali_display} — "
+        f"ساعت {reservation_datetime.strftime('%H:%M')}"
+    )

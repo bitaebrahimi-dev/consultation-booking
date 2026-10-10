@@ -1,23 +1,52 @@
 <!DOCTYPE html>
+{% load static %}
 <html lang="fa" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>رزرو مشاوره</title>
+
+    <link rel="stylesheet" href="{% static 'booking/style.css' %}">
 </head>
+
 <body>
 
-    <h1>رزرو مشاوره</h1>
+    <main class="page-container">
 
-    <form method="post">
-        {% csrf_token %}
+        <section class="form-section">
 
-        {{ form.as_p }}
+            <h1 class="page-title">
+                رزرو مشاوره
+            </h1>
 
-        <button type="submit">
-            ثبت رزرو
-        </button>
-    </form>
+            {% if selected_slot_display %}
+                <div class="selected-slot-box">
+                    <span>زمان انتخاب‌شده:</span>
+                    <strong>{{ selected_slot_display }}</strong>
+                </div>
+            {% endif %}
+
+            <form method="post" class="reservation-form">
+
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    <div class="form-errors">
+                        {{ form.non_field_errors }}
+                    </div>
+                {% endif %}
+
+                {{ form.as_p }}
+
+                <button type="submit" class="submit-button">
+                    ثبت رزرو
+                </button>
+
+            </form>
+
+        </section>
+
+    </main>
 
 </body>
 </html>

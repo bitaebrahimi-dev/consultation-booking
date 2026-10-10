@@ -12,6 +12,9 @@ class ReservationForm(forms.ModelForm):
             "topic",
             "scheduled_at",
         ]
+        widgets = {
+            "scheduled_at": forms.HiddenInput(),
+        }
 
     def clean_scheduled_at(self):
         scheduled_at = self.cleaned_data["scheduled_at"]

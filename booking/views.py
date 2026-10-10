@@ -1,13 +1,19 @@
 from django.db import IntegrityError, transaction
-from django.http import HttpResponse
 from django.shortcuts import render
 
 from .forms import ReservationForm
-
+from .services import (
+    get_next_7_days_with_jalali,
+    format_selected_slot,
+    format_reservation_datetime,
+)
 
 def create_reservation(request):
     if request.method == "POST":
         form = ReservationForm(request.POST)
+
+        selected_slot = request.POST.get("scheduled_at")
+        selected_slot_display = format_selected_slot(selected_slot)
 
         if form.is_valid():
             try:
@@ -21,21 +27,47 @@ def create_reservation(request):
                 )
 
             else:
+                reservation_datetime_display = format_reservation_datetime(
+                    reservation.scheduled_at
+                )
+
                 return render(
                     request,
                     "booking/reservation_success.html",
                     {
                         "reservation": reservation,
+                        "reservation_datetime_display": reservation_datetime_display,
                     },
                 )
 
     else:
-        form = ReservationForm()
+        selected_slot = request.GET.get("slot")
+        selected_slot_display = format_selected_slot(selected_slot)
+
+        form = ReservationForm(
+            initial={
+                "scheduled_at": selected_slot,
+            }
+        )
 
     return render(
         request,
         "booking/reservation_form.html",
         {
             "form": form,
+            "selected_slot": selected_slot,
+            "selected_slot_display": selected_slot_display,
+        },
+    )
+
+
+def availability(request):
+    days = get_next_7_days_with_jalali()
+
+    return render(
+        request,
+        "booking/availability.html",
+        {
+            "days": days,
         },
     )

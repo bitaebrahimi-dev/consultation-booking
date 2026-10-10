@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>زمان‌های قابل رزرو</title>
+
+    <link rel="stylesheet" href="{% static 'booking/style.css' %}">
+</head>
+<body>
+
+<main class="page-container">
+
+    <section class="availability-section">
+
+        <h1 class="page-title">
+            زمان‌های قابل رزرو
+        </h1>
+
+        <div class="days-list">
+
+            {% for day in days %}
+
+            <div class="day-card">
+
+                <h3 class="day-title">
+                    {{ day.jalali_display }}
+                </h3>
+
+                {% if day.slots %}
+
+                <div class="slots-list">
+
+                    {% for slot in day.slots %}
+
+                    <a
+                            class="slot-button"
+                            href="{% url 'create_reservation' %}?slot={{ slot|date:'Y-m-d H:i' }}"
+                    >
+                        {{ slot|date:"H:i" }}
+                    </a>
+
+                    {% endfor %}
+
+                </div>
+
+                {% else %}
+
+                <p class="no-slot-message">
+                    زمان آزادی برای این روز وجود ندارد.
+                </p>
+
+                {% endif %}
+
+            </div>
+
+            {% endfor %}
+
+        </div>
+
+    </section>
+
+</main>
+
+</body>
+
+</html>
